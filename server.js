@@ -5,55 +5,125 @@ const cors = require("cors");
 const multer = require("multer");
 
 
+const { createClient } = require("@supabase/supabase-js");
+
+
 const app = express();
 
-// o cors permite a ligação local entre o mesmo sistema
 
 app.use(cors());
 
 app.use(express.static("public"));
 
+app.use('/models', express.static('models'));
 
-const storage = multer.diskStorage({
 
-  destination: (req, file, cb) => {
+const supabase = createClient("https://epjayuksahuwyumxxwwy.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwamF5dWtzYWh1d3l1bXh4d3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNTgzMTMsImV4cCI6MjA5NTYzNDMxM30.wLEhbLFnYSMrDzNwu1efEHYYXCXrhwc98GEJM-n5BTY");
 
-    cb(null, "uploads/");
-
-  },
-
-  filename: (req, file, cb) => {
-
-    cb(null, Date.now() + ".jpg");
-
-  }
-
-});
-
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage });
 
 
-// endpoint para guardar um ficheiro/foto no local que foi designado na criação de 'storage' e depois como upload através de multer
+app.post("/upload", upload.single("photo"), async (req, res) => {
 
-app.post("/upload", upload.single("photo"), (req, res) => {
 
-  console.log("Foto recebida:", req.file.filename);
+    try {
 
-  res.json({
 
-    message: "Foto guardada",
+        const emotion = req.body.emotion;
 
-    file: req.file.filename
 
-  });
+        const file = req.file;
 
+
+        const fileName =
+
+            Date.now() + ".jpg";
+
+
+        // Upload para storage no supabase
+
+        const { data, error } =
+
+            await supabase.storage
+
+                .from("photos")
+
+                .upload(fileName,
+
+                    file.buffer,
+
+                    {
+
+                        contentType: "image/jpeg"
+
+                    });
+
+
+        if (error)
+
+            throw error;
+
+
+        // Ligar URL pública
+
+        const { data: publicUrl } =
+
+            supabase.storage
+
+                .from("photos")
+
+                .getPublicUrl(fileName);
+
+
+        // Guardar na tabela
+
+        await supabase
+
+            .from("students")
+
+            .insert([{
+
+                name: "unknown",
+
+                emotion: emotion,
+
+                photo_url:
+
+                    publicUrl.publicUrl
+
+
+            }]);
+
+
+        res.json({
+
+            message: "Guardado com sucesso"
+
+        });
+
+
+    }
+
+    catch (err) {
+
+        console.log(err);
+
+        res.status(500).json({
+
+            error: err.message
+
+        });
+
+    }
 
 });
 
 
 app.listen(3000, () => {
 
-  console.log("Servidor a correr em http://localhost:3000");
+    console.log("Servidor a correr em http://localhost:3000");
 
 });
+
